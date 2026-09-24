@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Aconducir · Conectar WhatsApp</title>
+<style>
+  :root { --bg:#f5f6f8; --card:#fff; --ink:#1c1e21; --muted:#606770; --line:#e4e6eb; --brand:#e8341c; --ok:#1a7f37; --warn:#b54708; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+  main { max-width:640px; margin:0 auto; padding:32px 16px 64px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:24px; margin-bottom:16px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  h2 { font-size:17px; margin:0 0 12px; }
+  p { margin:0 0 12px; color:var(--muted); }
+  ol { margin:0; padding-left:20px; }
+  li { margin-bottom:6px; }
+  .num { font-weight:700; color:var(--ink); }
+  button.primary { width:100%; padding:14px 18px; border:0; border-radius:8px; background:#1877f2; color:#fff; font-size:16px; font-weight:600; cursor:pointer; }
+  button.primary:disabled { background:#9cbcf0; cursor:not-allowed; }
+  .status { padding:12px 14px; border-radius:8px; font-size:14px; margin-top:12px; display:none; }
+  .status.info { display:block; background:#e7f0fd; color:#0b4fad; }
+  .status.ok { display:block; background:#e6f4ea; color:var(--ok); }
+  .status.err { display:block; background:#fdecea; color:#b3261e; }
+  .warn { border-left:4px solid var(--warn); background:#fff8eb; padding:12px 14px; border-radius:6px; font-size:14px; color:#6b3b00; }
+  pre { background:#0f1115; color:#e6e6e6; padding:14px; border-radius:8px; font-size:13px; overflow-x:auto; white-space:pre-wrap; word-break:break-all; margin:0 0 10px; }
+  button.copy { padding:8px 14px; border:1px solid var(--line); background:#fff; border-radius:6px; cursor:pointer; font-size:14px; }
+  #resultCard { display:none; }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <h1>Conectar WhatsApp de Aconducir a la API</h1>
+    <p>Modo <strong>Coexistence</strong>: la app WhatsApp Business del celular sigue funcionando igual, con sus chats.</p>
+    <div class="warn">
+      Número a conectar: <span class="num">+593 99 129 1040</span><br>
+      Portafolio: <strong>Aconducir Escuela de Conducción</strong><br>
+      No elijas "Test WhatsApp Business Account" ni el número +1 555.
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Antes de empezar</h2>
+    <ol>
+      <li>Ten a mano el celular con la app <strong>WhatsApp Business</strong> actualizada.</li>
+      <li>Abre esta página en una <strong>computadora</strong>. El QR se escanea desde el celular.</li>
+      <li>Permite ventanas emergentes (pop-ups) en este sitio.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>Conectar</h2>
+    <button id="startBtn" class="primary" disabled>Cargando…</button>
+    <div id="status" class="status"></div>
+  </div>
+
+  <div class="card" id="resultCard">
+    <h2>Resultado: copia esto y envíaselo a Claude</h2>
+    <pre id="result"></pre>
+    <button class="copy" id="copyBtn">Copiar</button>
+  </div>
+</main>
+
+<script>
+  var APP_ID = '478086671020340';
+  var CONFIG_ID = '1801787500947133';
+  var GRAPH_VERSION = 'v23.0';
+
+  var captured = { session: null, code: null, error: null, at: null };
+  var statusEl = document.getElementById('status');
+  var btn = document.getElementById('startBtn');
+
+  function setStatus(kind, text) { statusEl.className = 'status ' + kind; statusEl.textContent = text; }
+
+  function render() {
+    captured.at = new Date().toISOString();
+    document.getElementById('resultCard').style.display = 'block';
+    document.getElementById('result').textContent = JSON.stringify(captured, null, 2);
+  }
+
+  document.getElementById('copyBtn').addEventListener('click', function () {
+    var txt = document.getElementById('result').textContent;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(txt).then(function () { setStatus('ok', 'Copiado.'); });
+    }
+  });
+
+  // Eventos de sesión del registro insertado (waba_id, phone_number_id, etc.)
+  window.addEventListener('message', function (event) {
+    if (typeof event.origin !== 'string' || !/(^|\.)facebook\.com$/.test(new URL(event.origin).hostname)) return;
+    var data;
+    try { data = JSON.parse(event.data); } catch (e) { return; }
+    if (!data || data.type !== 'WA_EMBEDDED_SIGNUP') return;
+    captured.session = data;
+    if (data.event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING' || data.event === 'FINISH') {
+      setStatus('ok', '¡Listo! Número conectado en modo Coexistence. Copia el resultado de abajo.');
+    } else if (data.event === 'CANCEL') {
+      setStatus('err', 'Registro cancelado' + (data.data && data.data.current_step ? ' en el paso: ' + data.data.current_step : '') + '.');
+    } else if (data.event === 'ERROR') {
+      setStatus('err', 'Error: ' + (data.data && data.data.error_message ? data.data.error_message : 'desconocido'));
+    }
+    render();
+  });
+
+  window.fbAsyncInit = function () {
+    FB.init({ appId: APP_ID, autoLogAppEvents: true, xfbml: false, version: GRAPH_VERSION });
+    btn.disabled = false;
+    btn.textContent = 'Conectar WhatsApp Business (Coexistence)';
+  };
+
+  btn.addEventListener('click', function () {
+    setStatus('info', 'Se abrió una ventana de Meta. Sigue los pasos y escanea el QR desde el celular…');
+    FB.login(function (response) {
+      if (response.authResponse && response.authResponse.code) {
+        captured.code = response.authResponse.code;
+        if (!captured.session) setStatus('ok', 'Autorización recibida. Copia el resultado de abajo.');
+      } else {
+        captured.error = response;
+        if (!captured.session) setStatus('err', 'La ventana se cerró sin completar el registro.');
+      }
+      render();
+    }, {
+      config_id: CONFIG_ID,
+      response_type: 'code',
+      override_default_response_type: true,
+      extras: {
+        setup: {},
+        featureType: 'whatsapp_business_app_onboarding',
+        sessionInfoVersion: '3'
+      }
+    });
+  });
+</script>
+<script async defer crossorigin="anonymous" src="https://connect.facebook.net/es_LA/sdk.js"></script>
+</body>
+</html>
